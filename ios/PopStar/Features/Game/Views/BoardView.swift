@@ -45,8 +45,18 @@ struct BoardView: View
                     isSelected: engine.selectedTileIDs.contains(tile.id),
                     isShaking: shakingTileID == tile.id
                 )
+                // Platzen (Entfernen) bzw. Spawn (Einfügen) eines neuen Felds.
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.2).combined(with: .opacity),
+                    removal: .scale(scale: 1.5).combined(with: .opacity)
+                ))
+                // Gestaffeltes Erscheinen nur bei Feldwechseln – Fallen und
+                // Platzen laufen über die Transaction des Spielzugs.
+                .animation(
+                    Design.spawnAnimation.delay(Double(tile.row + tile.column) * Design.spawnStagger),
+                    value: engine.boardGeneration
+                )
                 .position(layout.position(of: tile))
-                .transition(.scale(scale: 1.5).combined(with: .opacity))
                 .onTapGesture { onTap(tile) }
             }
         }

@@ -356,5 +356,27 @@ final class GameEngineTests: XCTestCase
         let engine = GameEngine(scoreStore: store)
         XCTAssertNil(engine.tap(atRow: 0, column: 0))
     }
+
+    // MARK: - Gruppen-Hilfe
+
+    func test_firstGroupTile_returnsTileFromARealGroup()
+    {
+        var colors = filledBoard(4)
+        colors[0][0] = 0
+        colors[0][1] = 0
+        let (engine, _) = makeEngine(colors: colors)
+
+        guard let tile = engine.firstGroupTile() else
+        {
+            return XCTFail("Es sollte einen Gruppenstein geben")
+        }
+        XCTAssertEqual(engine.tap(atRow: tile.row, column: tile.column), .selected(groupSize: 2))
+    }
+
+    func test_firstGroupTile_onBoardWithoutMoves_returnsNil()
+    {
+        let (engine, _) = makeEngine(colors: diagonalBoard())
+        XCTAssertNil(engine.firstGroupTile())
+    }
 }
 

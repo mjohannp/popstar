@@ -73,6 +73,13 @@ enum Design
     static let boardCornerRadius: CGFloat = 22
     static let popCoolDown: Duration = .seconds(0.32)
     static let stageEndDelay: Duration = .seconds(0.45)
+
+    /// Fallen und Platzen der Steine.
+    static let popAnimation: Animation = .spring(response: 0.32, dampingFraction: 0.82)
+    /// Erscheinen eines neuen Felds.
+    static let spawnAnimation: Animation = .spring(response: 0.38, dampingFraction: 0.8)
+    /// Verzögerung pro Kachel beim Spawn (diagonale Welle).
+    static let spawnStagger: Double = 0.014
 }
 
 /// Dunkler Hintergrund mit zwei Farbschimmern – wie die Web-Version.

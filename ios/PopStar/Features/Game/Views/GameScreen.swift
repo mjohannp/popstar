@@ -12,13 +12,15 @@ struct GameScreen: View
     @State private var isPopCoolDown = false
     @State private var isRestartDialogShown = false
     @State private var shakingTileID: TileModel.ID?
+    /// Dev-Hilfe: Start-Argument `-slowAnims` bremst alle Animationen.
+    @State private var isSlowMotion = false
 
     var body: some View
     {
         ZStack
         {
             AppBackground()
-            gameContent
+            slowable(gameContent)
             overlay
         }
         .alert("Wirklich neu starten?", isPresented: $isRestartDialogShown)
@@ -32,15 +34,39 @@ struct GameScreen: View
         .onAppear
         {
             soundPlayer.setMuted(!isSoundOn)
-            // Start-Argument für UI-Tests und Simulator-Screenshots.
-            if ProcessInfo.processInfo.arguments.contains("-skipIntro")
+            let arguments = ProcessInfo.processInfo.arguments
+            isSlowMotion = arguments.contains("-slowAnims")
+            // Start-Argumente für UI-Tests, Screenshots und Demo-Aufnahmen.
+            if arguments.contains("-skipIntro")
             {
                 engine.startGame()
+            }
+            if arguments.contains("-demoPop")
+            {
+                engine.startGame()
+                runDemoPop()
             }
         }
     }
 
     // MARK: - Aufbau
+
+    /// Wendet optional eine verlangsamte Animation auf den gesamten Inhalt an
+    /// (Start-Argument `-slowAnims`, für Screenshots und Aufnahmen).
+    @ViewBuilder
+    private func slowable(_ content: some View) -> some View
+    {
+        if isSlowMotion
+        {
+            content.transaction { transaction in
+                transaction.animation = transaction.animation?.speed(0.15)
+            }
+        }
+        else
+        {
+            content
+        }
+    }
 
     private var gameContent: some View
     {
@@ -134,7 +160,15 @@ struct GameScreen: View
 
     private func handleTap(_ tile: TileModel)
     {
-        guard !isPopCoolDown, let outcome = engine.tap(atRow: tile.row, column: tile.column) else { return }
+        guard !isPopCoolDown else { return }
+
+        // Der Spielzug muss in einer animierten Transaction laufen, damit
+        // Platzen (Transition) und Fallen (Position) animiert werden.
+        let outcome = withAnimation(Design.popAnimation)
+        {
+            engine.tap(atRow: tile.row, column: tile.column)
+        }
+        guard let outcome else { return }
 
         switch outcome
         {
@@ -187,6 +221,20 @@ struct GameScreen: View
     private func restart()
     {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { engine.restart() }
+    }
+
+    /// Spielt einen Beispielzug ab (Start-Argument `-demoPop`), um die
+    /// Animationen auf Screenshots und Aufnahmen sichtbar zu machen.
+    private func runDemoPop()
+    {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(0.8))
+            guard let tile = engine.firstGroupTile() else { return }
+
+            handleTap(tile)
+            try? await Task.sleep(for: .seconds(0.3))
+            handleTap(tile)
+        }
     }
 }
 

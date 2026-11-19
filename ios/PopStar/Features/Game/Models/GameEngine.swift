@@ -61,6 +61,9 @@ final class GameEngine
     private(set) var stage = 1
     private(set) var bestScore: Int
     private(set) var phase: Phase = .intro
+    /// Zähler für jedes neu aufgebaute Feld – die View nutzt ihn, um den
+    /// Spawn-Stagger nur bei Feldwechseln anzuwenden.
+    private(set) var boardGeneration = 0
 
     /// Zufallsquelle – für Tests durch einen deterministischen Generator ersetzbar.
     var rng: any RandomNumberGenerator = SystemRandomNumberGenerator()
@@ -204,6 +207,24 @@ final class GameEngine
     }
 
     // MARK: - Test- und Preview-Hilfen
+
+    /// Liefert den ersten Stein, der zu einer Gruppe mit mindestens zwei
+    /// gleichen Farben gehört – für Demo-Modus und Tests.
+    func firstGroupTile() -> TileModel?
+    {
+        for candidate in tiles
+        {
+            for neighbor in neighborPositions(of: candidate)
+            {
+                guard let id = grid[neighbor.row][neighbor.column],
+                      let other = tile(atRow: neighbor.row, column: neighbor.column),
+                      other.colorIndex == candidate.colorIndex
+                else { continue }
+                return candidate
+            }
+        }
+        return nil
+    }
 
     /// Baut das Feld direkt aus einer Farbmatrix auf (Reihen von oben nach unten).
     func load(colors: [[Int]])
@@ -386,6 +407,7 @@ final class GameEngine
         tiles = newTiles
         grid = newGrid
         selectedTileIDs = []
+        boardGeneration += 1
     }
 
     // MARK: - Statische Regeln
