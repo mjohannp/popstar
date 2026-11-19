@@ -1,15 +1,33 @@
 # Pop Star
 
-Nachbau des Klassikers **PopStar!** als Single-Page-App – eine einzige `index.html`,
-kein Build, keine Abhängigkeiten.
+Nachbau des Klassikers **PopStar!** – als Web-SPA (`index.html`, kein Build,
+keine Abhängigkeiten) und als native iOS-App in SwiftUI (`ios/`).
 
-## Starten
+## Web starten
 
 ```bash
 open index.html          # macOS
 # oder
 python3 -m http.server   # dann http://localhost:8000
 ```
+
+## iOS-App
+
+```bash
+cd ios
+xcodegen generate        # nur nötig, wenn sich Dateien/Struktur ändern
+open PopStar.xcodeproj   # in Xcode: Scheme „PopStar", Zielgerät wählen, Run
+```
+
+- **SwiftUI ab iOS 17**, MVVM: `GameEngine` (`@Observable`) enthält die komplette
+  Spiellogik ohne UI, die Views sind rein deklarativ
+- Sounds werden zur Laufzeit per `AVAudioEngine` synthetisiert, Haptik über
+  `UIFeedbackGenerator` – keine Audio-Dateien
+- Rekord in `UserDefaults`
+- Unit-Tests der Spiellogik: `xcodebuild test -scheme PopStar` (Punkteformel,
+  Gruppensuche, Schwerkraft/Spalten, Bonus, Stage-Ende)
+- Für das eigene iPhone: in Xcode unter *Signing & Capabilities* das eigene
+  Team auswählen – das Projekt ist für automatisches Signing vorbereitet
 
 ## Auf dem Handy spielen (GitHub Pages)
 
@@ -35,7 +53,7 @@ Web-Manifest startet das Spiel dann ohne Browser-Leiste im Vollbild.
   übrig, gibt es einen Bonus von **2000 − 20 × Blöcke²**.
 - Danach startet die nächste Stage – gespielt wird, bis du aufhörst.
 
-## Features
+## Web-Features
 
 - Vollständig responsiv (Handy bis Desktop), Safe-Area-Support
 - Weiche Fall-, Auswahl- und Platz-Animationen, Partikel, Punkte-Popups
@@ -43,7 +61,7 @@ Web-Manifest startet das Spiel dann ohne Browser-Leiste im Vollbild.
 - Rekord wird lokal gespeichert (`localStorage`)
 - Tastatur: `Esc` hebt die Auswahl auf
 
-## Aufbau
+## Web-Aufbau
 
 Alles steckt in `index.html`:
 
