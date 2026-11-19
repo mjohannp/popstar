@@ -3,8 +3,9 @@ import Foundation
 /// Spielregeln von PopStar: Gruppen finden, Punkte vergeben, Steine fallen
 /// lassen, Spalten zusammenziehen und Stages abschließen.
 ///
-/// Die Engine enthält keinerlei UI-Code und ist dadurch vollständig
-/// unit-testbar. Die Views beobachten den Zustand über `@Observable`.
+/// Die Feldgröße ist frei wählbar (`rows` × `columns`), alle Regeln arbeiten
+/// dimensionsunabhängig. Die Engine enthält keinerlei UI-Code und ist dadurch
+/// vollständig unit-testbar. Die Views beobachten den Zustand über `@Observable`.
 @MainActor
 @Observable
 final class GameEngine
@@ -13,8 +14,6 @@ final class GameEngine
 
     enum Config
     {
-        static let rows = 10
-        static let columns = 10
         static let colorCount = 5
         /// Bis zu so vielen restlichen Steinen gibt es einen Stage-Bonus.
         static let maximumRemainingForBonus = 10
@@ -47,6 +46,13 @@ final class GameEngine
         case rejected
     }
 
+    // MARK: - Feldmaße
+
+    /// Anzahl Reihen (von oben nach unten).
+    let rows: Int
+    /// Anzahl Spalten (von links nach rechts).
+    let columns: Int
+
     // MARK: - Zustand
 
     private(set) var tiles: [TileModel] = []
@@ -65,8 +71,18 @@ final class GameEngine
 
     // MARK: - Init
 
-    init(scoreStore: any ScoreStoring = UserDefaultsScoreStore(), rng: (any RandomNumberGenerator)? = nil)
+    /// - Parameters:
+    ///   - rows: Anzahl Reihen (Standard 10).
+    ///   - columns: Anzahl Spalten (Standard 10).
+    init(
+        rows: Int = 10,
+        columns: Int = 10,
+        scoreStore: any ScoreStoring = UserDefaultsScoreStore(),
+        rng: (any RandomNumberGenerator)? = nil
+    )
     {
+        self.rows = max(2, rows)
+        self.columns = max(2, columns)
         self.scoreStore = scoreStore
         bestScore = scoreStore.loadBest()
         if let rng
@@ -255,19 +271,19 @@ final class GameEngine
     {
         var positions: [(row: Int, column: Int)] = []
         if tile.row > 0 { positions.append((tile.row - 1, tile.column)) }
-        if tile.row < Config.rows - 1 { positions.append((tile.row + 1, tile.column)) }
+        if tile.row < rows - 1 { positions.append((tile.row + 1, tile.column)) }
         if tile.column > 0 { positions.append((tile.row, tile.column - 1)) }
-        if tile.column < Config.columns - 1 { positions.append((tile.row, tile.column + 1)) }
+        if tile.column < columns - 1 { positions.append((tile.row, tile.column + 1)) }
         return positions
     }
 
     /// Lässt alle Steine in einer Spalte nach unten rutschen.
     private func applyGravity()
     {
-        for column in 0..<Config.columns
+        for column in 0..<columns
         {
-            var writeRow = Config.rows - 1
-            for row in stride(from: Config.rows - 1, through: 0, by: -1)
+            var writeRow = rows - 1
+            for row in stride(from: rows - 1, through: 0, by: -1)
             {
                 guard let id = grid[row][column] else { continue }
                 if writeRow != row
@@ -284,14 +300,14 @@ final class GameEngine
     private func collapseColumns()
     {
         var targetColumn = 0
-        for column in 0..<Config.columns
+        for column in 0..<columns
         {
-            let isEmpty = (0..<Config.rows).allSatisfy { grid[$0][column] == nil }
+            let isEmpty = (0..<rows).allSatisfy { grid[$0][column] == nil }
             if isEmpty { continue }
 
             if targetColumn != column
             {
-                for row in 0..<Config.rows
+                for row in 0..<rows
                 {
                     grid[row][targetColumn] = grid[row][column]
                     grid[row][column] = nil
@@ -305,9 +321,9 @@ final class GameEngine
     private func syncTilesWithGrid()
     {
         var tilesByID = Dictionary(uniqueKeysWithValues: tiles.map { ($0.id, $0) })
-        for row in 0..<Config.rows
+        for row in 0..<rows
         {
-            for column in 0..<Config.columns
+            for column in 0..<columns
             {
                 guard let id = grid[row][column], var tile = tilesByID[id] else { continue }
                 tile.row = row
@@ -325,10 +341,10 @@ final class GameEngine
     private func colorMatrix() -> [[Int]]
     {
         let colorsByID = Dictionary(uniqueKeysWithValues: tiles.map { ($0.id, $0.colorIndex) })
-        var colors = Array(repeating: Array(repeating: -1, count: Config.columns), count: Config.rows)
-        for row in 0..<Config.rows
+        var colors = Array(repeating: Array(repeating: -1, count: columns), count: rows)
+        for row in 0..<rows
         {
-            for column in 0..<Config.columns
+            for column in 0..<columns
             {
                 if let id = grid[row][column]
                 {
@@ -344,8 +360,8 @@ final class GameEngine
         var colors: [[Int]]
         repeat
         {
-            colors = (0..<Config.rows).map { _ in
-                (0..<Config.columns).map { _ in Int(rng.next() % UInt64(Config.colorCount)) }
+            colors = (0..<rows).map { _ in
+                (0..<columns).map { _ in Int(rng.next() % UInt64(Config.colorCount)) }
             }
         } while !Self.hasMoves(in: colors)
 
@@ -355,11 +371,11 @@ final class GameEngine
     private func rebuild(from colors: [[Int]])
     {
         var newTiles: [TileModel] = []
-        var newGrid = Array(repeating: Array(repeating: Optional<TileModel.ID>.none, count: Config.columns), count: Config.rows)
+        var newGrid = Array(repeating: Array(repeating: Optional<TileModel.ID>.none, count: columns), count: rows)
 
-        for row in 0..<Config.rows
+        for row in 0..<rows
         {
-            for column in 0..<Config.columns
+            for column in 0..<columns
             {
                 let tile = TileModel(id: nextTileID, colorIndex: colors[row][column], row: row, column: column)
                 nextTileID += 1

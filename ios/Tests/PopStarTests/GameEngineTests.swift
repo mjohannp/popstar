@@ -46,20 +46,21 @@ final class ScoreStoreMock: ScoreStoring
 @MainActor
 final class GameEngineTests: XCTestCase
 {
+    private let rowCount = 10
+    private let columnCount = 10
+
     // MARK: - Hilfsfunktionen
 
-    private func makeEngine(colors: [[Int]]? = nil, storedBest: Int = 0, seed: UInt64? = nil) -> (engine: GameEngine, store: ScoreStoreMock)
+    private func makeEngine(
+        colors: [[Int]]? = nil,
+        storedBest: Int = 0,
+        seed: UInt64? = nil,
+        rows: Int = 10,
+        columns: Int = 10
+    ) -> (engine: GameEngine, store: ScoreStoreMock)
     {
         let store = ScoreStoreMock(storedBest: storedBest)
-        let engine: GameEngine
-        if let seed
-        {
-            engine = GameEngine(scoreStore: store, rng: SeededGenerator(seed: seed))
-        }
-        else
-        {
-            engine = GameEngine(scoreStore: store)
-        }
+        let engine = GameEngine(rows: rows, columns: columns, scoreStore: store, rng: seed.map { SeededGenerator(seed: $0) })
         if let colors
         {
             engine.load(colors: colors)
@@ -68,16 +69,16 @@ final class GameEngineTests: XCTestCase
         return (engine, store)
     }
 
-    private func filledBoard(_ color: Int) -> [[Int]]
+    private func filledBoard(_ color: Int, rows: Int = 10, columns: Int = 10) -> [[Int]]
     {
-        Array(repeating: Array(repeating: color, count: GameEngine.Config.columns), count: GameEngine.Config.rows)
+        Array(repeating: Array(repeating: color, count: columns), count: rows)
     }
 
     /// Feld ohne mögliche Züge: Farbindex = (Reihe + Spalte) % 5.
     private func diagonalBoard() -> [[Int]]
     {
-        (0..<GameEngine.Config.rows).map { row in
-            (0..<GameEngine.Config.columns).map { column in (row + column) % 5 }
+        (0..<rowCount).map { row in
+            (0..<columnCount).map { column in (row + column) % 5 }
         }
     }
 
@@ -171,7 +172,7 @@ final class GameEngineTests: XCTestCase
         {
             colors[row][0] = 1
         }
-        for row in 5..<GameEngine.Config.rows
+        for row in 5..<rowCount
         {
             colors[row][0] = 0
         }
@@ -195,7 +196,7 @@ final class GameEngineTests: XCTestCase
     {
         var colors = filledBoard(4)
         // Spalte 0 komplett in Farbe 3, rechts davon ein einzelner Stein in Spalte 3.
-        for row in 0..<GameEngine.Config.rows
+        for row in 0..<rowCount
         {
             colors[row][0] = 3
         }
@@ -219,14 +220,14 @@ final class GameEngineTests: XCTestCase
     {
         let (engine, _) = makeEngine(colors: diagonalBoard())
 
-        XCTAssertTrue(engine.hasMoves() == false)
+        XCTAssertFalse(engine.hasMoves())
         XCTAssertTrue(engine.evaluateStageEnd())
 
         guard case .stageFinished(let summary) = engine.phase else
         {
             return XCTFail("Phase sollte stageFinished sein")
         }
-        XCTAssertEqual(summary.remaining, 100)
+        XCTAssertEqual(summary.remaining, rowCount * columnCount)
         XCTAssertEqual(summary.bonus, 0)
         XCTAssertEqual(summary.totalScore, 0)
         XCTAssertFalse(summary.isNewRecord)
@@ -253,7 +254,7 @@ final class GameEngineTests: XCTestCase
         {
             return XCTFail("Phase sollte stageFinished sein")
         }
-        XCTAssertEqual(summary.remaining, 97)
+        XCTAssertEqual(summary.remaining, rowCount * columnCount - 3)
         XCTAssertEqual(summary.totalScore, 45)
         XCTAssertTrue(summary.isNewRecord)
         XCTAssertEqual(store.savedValues, [45])
@@ -285,8 +286,42 @@ final class GameEngineTests: XCTestCase
             let store = ScoreStoreMock()
             let engine = GameEngine(scoreStore: store, rng: SeededGenerator(seed: seed))
             XCTAssertTrue(engine.hasMoves(), "Seed \(seed) erzeugte ein Feld ohne Züge")
-            XCTAssertEqual(engine.tiles.count, 100)
+            XCTAssertEqual(engine.tiles.count, engine.rows * engine.columns)
         }
+    }
+
+    func test_init_withCustomBoardSize_8x12_builds96Tiles()
+    {
+        let store = ScoreStoreMock()
+        let engine = GameEngine(rows: 12, columns: 8, scoreStore: store, rng: SeededGenerator(seed: 42))
+
+        XCTAssertEqual(engine.rows, 12)
+        XCTAssertEqual(engine.columns, 8)
+        XCTAssertEqual(engine.tiles.count, 96)
+        XCTAssertNotNil(engine.tile(atRow: 11, column: 7))
+        XCTAssertNil(engine.tile(atRow: 11, column: 8))
+        XCTAssertNil(engine.tile(atRow: 12, column: 7))
+    }
+
+    func test_gravity_andCollapse_workOn8x12Board()
+    {
+        var colors = filledBoard(4, rows: 12, columns: 8)
+        // Untere Hälfte von Spalte 0 in Farbe 0 – Plattzen lässt alles oben fallen.
+        for row in 6..<12
+        {
+            colors[row][0] = 0
+        }
+        colors[0][0] = 1
+        let (engine, _) = makeEngine(colors: colors, rows: 12, columns: 8)
+
+        XCTAssertEqual(engine.tap(atRow: 8, column: 0), .selected(groupSize: 6))
+        XCTAssertEqual(engine.tap(atRow: 8, column: 0), .popped(groupSize: 6, points: 180))
+
+        // Die sechs Steine über der Gruppe (Reihe 0–5) rutschen auf Reihe 6–11.
+        XCTAssertEqual(engine.tile(atRow: 6, column: 0)?.colorIndex, 1)
+        XCTAssertEqual(engine.tile(atRow: 11, column: 0)?.colorIndex, 4)
+        XCTAssertNil(engine.tile(atRow: 0, column: 0))
+        XCTAssertEqual(engine.score, 180)
     }
 
     // MARK: - Neustart und Stages
@@ -298,7 +333,7 @@ final class GameEngineTests: XCTestCase
 
         XCTAssertEqual(engine.score, 0)
         XCTAssertEqual(engine.stage, 1)
-        XCTAssertEqual(engine.tiles.count, 100)
+        XCTAssertEqual(engine.tiles.count, rowCount * columnCount)
         XCTAssertEqual(engine.phase, .playing)
     }
 
@@ -309,7 +344,7 @@ final class GameEngineTests: XCTestCase
         engine.startNextStage()
 
         XCTAssertEqual(engine.stage, 2)
-        XCTAssertEqual(engine.tiles.count, 100)
+        XCTAssertEqual(engine.tiles.count, rowCount * columnCount)
         XCTAssertEqual(engine.phase, .playing)
     }
 
@@ -322,3 +357,4 @@ final class GameEngineTests: XCTestCase
         XCTAssertNil(engine.tap(atRow: 0, column: 0))
     }
 }
+

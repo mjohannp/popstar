@@ -43,7 +43,8 @@ Web-Manifest startet das Spiel dann ohne Browser-Leiste im Vollbild.
 
 ## Spielregeln
 
-- Das Feld ist 10×10 Sterne in fünf Farben.
+- Das Feld besteht aus Sternen in fünf Farben (Web: 10×10, iOS-App: 8 Spalten
+  × 12 Reihen – frei konfigurierbar über `GameEngine(rows:columns:)`).
 - Tippe auf eine Gruppe aus **2 oder mehr** gleichfarbigen, waagerecht/senkrecht
   verbundenen Sternen – sie leuchten auf.
 - Tippe erneut auf die Gruppe, um sie platzen zu lassen.

@@ -3,7 +3,8 @@ import SwiftUI
 /// Hauptszene: HUD, Spielfeld, Statuszeile und Overlays.
 struct GameScreen: View
 {
-    @State private var engine = GameEngine()
+    /// Feldgröße: 8 Spalten × 12 Reihen – beliebig änderbar.
+    @State private var engine = GameEngine(rows: 12, columns: 8)
     @State private var soundPlayer = SoundPlayer()
     @State private var hapticsPlayer = HapticsPlayer()
 
@@ -44,14 +45,15 @@ struct GameScreen: View
     private var gameContent: some View
     {
         GeometryReader { proxy in
-            // Feldgröße: durch die Breite begrenzt, plus Reserve für HUD und Leiste.
-            let sideLength = min(proxy.size.width, proxy.size.height - 150)
+            // Für HUD und Leiste bleibt ein fester Streifen übrig; der Rest
+            // gehört dem Feld, das sich aus Breite UND Höhe rechnet.
+            let boardSpace = CGSize(width: proxy.size.width, height: proxy.size.height - 150)
 
             VStack(spacing: Design.spacing)
             {
                 HudView(stage: engine.stage, score: engine.score, bestScore: max(engine.bestScore, engine.score))
                 Spacer(minLength: 0)
-                BoardView(engine: engine, sideLength: sideLength, shakingTileID: shakingTileID, onTap: handleTap)
+                BoardView(engine: engine, availableSize: boardSpace, shakingTileID: shakingTileID, onTap: handleTap)
                 Spacer(minLength: 0)
                 FooterView(
                     info: footerInfo,

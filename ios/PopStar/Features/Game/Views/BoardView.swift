@@ -4,13 +4,20 @@ import SwiftUI
 struct BoardView: View
 {
     let engine: GameEngine
-    let sideLength: CGFloat
+    let availableSize: CGSize
     let shakingTileID: TileModel.ID?
     let onTap: (TileModel) -> Void
 
     var body: some View
     {
-        panel(BoardLayout(sideLength: sideLength))
+        panel(
+            BoardLayout(
+                availableWidth: availableSize.width,
+                availableHeight: availableSize.height,
+                rows: engine.rows,
+                columns: engine.columns
+            )
+        )
     }
 
     private func panel(_ layout: BoardLayout) -> some View
@@ -43,6 +50,6 @@ struct BoardView: View
                 .onTapGesture { onTap(tile) }
             }
         }
-        .frame(width: layout.boardSideLength, height: layout.boardSideLength)
+        .frame(width: layout.boardWidth, height: layout.boardHeight)
     }
 }
